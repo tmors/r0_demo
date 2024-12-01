@@ -3,12 +3,26 @@ use zk_methods::ZKLOGIN_ELF;
 
 fn main() {
     println!("this is prover zklogin");
-    let a: String = String::from("this is jwt");
-    let b: String = String::from("jwt");
+    let jwt: &str = r#"{
+        "iss": "https://accounts.google.com",
+        "sub": "110169484474386276334",
+        "aud": "your-client-id.apps.googleusercontent.com",
+        "exp": 1783066337,
+        "iat": 1783066337
+    }"#;
+    let iss: String = String::from("https://accounts.google.com");
+    let sub: String = String::from("110169484474386276334");
+    let aud: String = String::from("your-client-id.apps.googleusercontent.com");
+    let exp: u64 = 1783066337;
+    let iat: u64 = 1783066337;
 
     let env = ExecutorEnv::builder()
-        .write(&a).unwrap()
-        .write(&b).unwrap()
+        .write(&jwt).unwrap()
+        .write(&iss).unwrap()
+        .write(&sub).unwrap()
+        .write(&aud).unwrap()
+        .write(&exp).unwrap()
+        .write(&iat).unwrap()
         .build()
         .unwrap();
 

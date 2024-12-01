@@ -15,12 +15,24 @@ fn main() {
     let receipt = bincode::deserialize::<Receipt>(&receipt_file).unwrap();
 
     // 从 receipt 中读取结果
-    let (public_pattern, contains): (String, bool) = receipt.journal.decode().unwrap();
+    let (iss, iat, exp): (String, u64, u64) = receipt.journal.decode().unwrap();
 
-    println!("Pattern '{}' {} in the secret text",
-        public_pattern,
-        if contains { "was found" } else { "was NOT found" }
-    );
+    // Let's print the results
+    println!("iss: {}", iss);
+    println!("iat: {}", iat);
+    println!("exp: {}", exp);
+
+    if iss != "https://accounts.google.com" {
+        panic!("iss mismatch");
+    }
+
+    // if now time is greater than exp time then the token is expired
+    let now = chrono::Utc::now().timestamp();
+    println!("{}", now);
+    if now > exp as i64 {
+        panic!("Token is expired");
+    }
+
 
 	// Let's verify if the receipt that was generated was not created tampered with
     let _verification = match receipt.verify(ZKLOGIN_ID){
