@@ -1,62 +1,61 @@
 #![no_main]
 
-// use std::error::Error;
-// #![no_std]
 use risc0_zkvm::guest::env;
+use jwt_core::Validator;
 use serde::{Deserialize, Serialize};
-
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use thiserror::Error;
 risc0_zkvm::guest::entry!(main);
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct GoogleClaims {
-    // 必须字段
-    iss: String,         // 发行者 (应该是 "https://accounts.google.com")
-    sub: String,         // Subject (用户ID)
-    aud: String,         // 目标受众 (你的 Google Client ID)
-    iat: u64,           // 发行时间
-    exp: u64,           // 过期时间
+    iss: String,           // Issuer
+    aud: String,           // Audience
+    sub: String,           // Subject
+    email: String,         // Email
+    name: String,          // Name
+    iat: u64,              // Issued at
+    exp: u64,              // Expiration time
 }
-//
+
+#[derive(Error, Debug)]
+pub enum JwtError {
+    #[error("Invalid JWT format")]
+    Format,
+    #[error("Base64 decode error: {0}")]
+    Base64(#[from] base64::DecodeError),
+    #[error("JSON decode error: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+pub fn parse_jwt_claims(token: &str) -> Result<(GoogleClaims, String), JwtError> {
+    // Split the JWT into parts
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() != 3 {
+        return Err(JwtError::Format);
+    }
+
+    // Decode the payload (second part)
+    let payload = URL_SAFE_NO_PAD.decode(parts[1])?;
+    let payload_str = String::from_utf8_lossy(&payload);
+    println!("{}", payload_str);
+    // Parse into Claims struct
+    let claims = serde_json::from_str(&payload_str)?;
+
+    Ok((claims, payload_str.into_owned()))
+}
 
 fn main() {
-    // 私密输入 a (要搜索的主字符串)
     println!("this is guest zklogin");
     let jwt: String = env::read();
-    // 公共输入 b (要查找的子字符串)
-    let iss: String = env::read();
-    let sub: String = env::read();
-    let aud: String = env::read();
-    let exp: u64 = env::read();
-    let iat: u64 = env::read();
+    let pubkey: String = env::read();
 
-    // 反序列化 JWT
-    let claims = match serde_json::from_str::<GoogleClaims>(&jwt) {
-        Ok(claims) => claims,
-        Err(e) => {
-            println!("Deserialization error: {}", e);
-            panic!("Failed to deserialize JWT");
-        }
-    };
-
-    if claims.iss != iss {
-        panic!("iss mismatch");
-    }
-
-    if claims.sub != sub {
-        panic!("sub mismatch");
-    }
-
-    if claims.aud != aud {
-        panic!("aud mismatch");
-    }
-
-    if claims.exp != exp {
-        panic!("exp mismatch");
-    }
-
-    if claims.iat != iat {
-        panic!("iat mismatch");
-    }
-
-    env::commit(&(iss, iat, exp));
+    // 1. check sign is right
+    // 2. check exp is not expired
+    // 3. check publicWtns is right
+    let validator = pubkey.parse::<Validator>().unwrap();
+    let valid_token = validator.validate_token_integrity(&jwt).unwrap();
+    let (claims, payload_str) = parse_jwt_claims(jwt.as_str())
+        .expect("failed to parse JWT claims");
+    env::commit(&(claims.iss, claims.iat, claims.exp));
 }

@@ -10,29 +10,12 @@ fn main() {
     println!("this is verify zklogin");
     let receipt_path ="./receipt_zklogin.bin".to_string();
     let receipt_file = std::fs::read(receipt_path).unwrap();
-
-    // As we has serialized the receipt we need to desrialize it
     let receipt = bincode::deserialize::<Receipt>(&receipt_file).unwrap();
 
-    // 从 receipt 中读取结果
     let (iss, iat, exp): (String, u64, u64) = receipt.journal.decode().unwrap();
 
-    // Let's print the results
-    println!("iss: {}", iss);
-    println!("iat: {}", iat);
-    println!("exp: {}", exp);
-
-    if iss != "https://accounts.google.com" {
-        panic!("iss mismatch");
-    }
-
-    // if now time is greater than exp time then the token is expired
-    let now = chrono::Utc::now().timestamp();
-    println!("{}", now);
-    if now > exp as i64 {
-        panic!("Token is expired");
-    }
-
+    // todo: add more check depending on the use case
+    // 1. check iss is right
 
 	// Let's verify if the receipt that was generated was not created tampered with
     let _verification = match receipt.verify(ZKLOGIN_ID){
